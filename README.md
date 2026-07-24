@@ -1,84 +1,84 @@
-# Electric Vehicle RAG Assistant
+# 新能源汽车知识库问答助手
 
-An electric vehicle customer-service assistant built with Streamlit, LangChain, Chroma, and DashScope models. It retrieves local knowledge-base documents, can call weather and location tools, and supports isolated multi-turn conversations in one browser session.
+一个基于 Streamlit、LangChain、Chroma 和 DashScope 模型构建的新能源汽车智能客服助手。它可以检索本地知识库文档，调用天气与定位工具，并在同一个浏览器会话中支持相互隔离的多轮对话。
 
-## Features
+## 功能特性
 
-- RAG retrieval over local electric vehicle knowledge documents.
-- Automatic incremental knowledge-base ingestion when a Streamlit session starts.
-- TXT, PDF, Markdown, DOCX, CSV, XLSX, PPTX, and UTF-8 HTML ingestion.
-- Streaming ReAct agent responses with retrieval, weather, location, and current-month tools.
-- Sidebar conversations: create, switch, and delete independent in-memory chats.
-- MD5-based ingestion deduplication to avoid inserting unchanged files twice.
+- 基于本地新能源汽车知识文档的 RAG 检索问答。
+- Streamlit 会话启动时自动增量导入知识库。
+- 支持 TXT、PDF、Markdown、Word（.docx）、CSV、Excel（.xlsx）、PPT（.pptx）和 UTF-8 编码的 HTML 文档导入。
+- 流式输出的 ReAct Agent，内置知识检索、天气、IP 定位和当前月份 4 个工具。
+- 侧边栏多会话管理：新建、切换、删除相互独立的内存对话。
+- 基于文件 MD5 的导入去重，跳过未变更文件的重复向量化。
 
-## Requirements
+## 环境要求
 
-- Python 3.10 or later.
-- A DashScope API key with access to the configured chat and embedding models.
+- Python 3.10 或更高版本。
+- 一个可访问所配置对话与向量模型的 DashScope API Key。
 
-## Install
+## 安装
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-$env:DASHSCOPE_API_KEY = "your-dashscope-api-key"
+$env:DASHSCOPE_API_KEY = "你的-dashscope-api-key"
 ```
 
-The API key is read by the DashScope integrations. Do not commit the key or a local `.env` file.
+API Key 由 DashScope 集成组件读取。请勿将 Key 或本地 `.env` 文件提交到仓库。
 
-## Run
+## 运行
 
 ```powershell
 python -m streamlit run app.py
 ```
 
-On the first page load, the app scans `data/` and incrementally inserts supported files into Chroma. Existing file content is skipped through `md5.text`.
+首次打开页面时，应用会扫描 `data/` 目录，把支持的文件增量写入 Chroma。已入库且内容未变的文件会通过 `md5.text` 记录跳过。
 
-To run ingestion manually:
+手动执行导入：
 
 ```powershell
 python -m rag.vector_store
 ```
 
-## Knowledge Files
+## 知识库文件
 
-Put source documents in `data/`. The configured supported extensions are:
+把源文档放进 `data/` 目录。当前支持的扩展名为：
 
 ```text
 txt, pdf, md, docx, csv, xlsx, pptx, html
 ```
 
-The committed `data/` directory contains electric-vehicle reference materials. Generated vector data is intentionally excluded from Git and is rebuilt locally.
+仓库中已提交的 `data/` 目录包含新能源汽车参考资料。生成的向量数据不纳入版本管理，在本地重新构建。
 
-## Conversations
+## 多会话
 
-The sidebar creates, switches, and deletes conversations. Each conversation has an independent message history, so multi-turn context is not shared between windows. Conversation records exist only in the active Streamlit browser session; a full browser refresh or a new browser session starts fresh state.
+侧边栏可以新建、切换和删除对话。每个对话拥有独立的消息历史，多轮上下文在不同对话之间互不共享。对话记录仅存在于当前 Streamlit 浏览器会话的内存中；刷新浏览器或开启新会话会重新开始。
 
-## Configuration
+## 配置
 
-- `config/rag.yml`: DashScope chat and embedding model names.
-- `config/chroma.yml`: Chroma collection, chunking, retrieval count, data path, and supported file types.
-- `config/prompts.yml`: prompt file paths.
-- `prompts/`: system and RAG summarization prompts.
+- `config/rag.yml`：DashScope 对话与向量模型名称。
+- `config/chroma.yml`：Chroma 集合、分块参数、检索数量、数据路径和支持的文件类型。
+- `config/prompts.yml`：提示词文件路径。
+- `prompts/`：系统提示词与 RAG 总结提示词。
 
-## Test
+## 测试
 
 ```powershell
 python -m pytest tests/test_agent_tools.py -v
 python -m compileall -q app.py agent rag model utils
 ```
 
-## Project Layout
+## 项目结构
 
 ```text
-agent/      ReAct agent, tools, and middleware
-config/     RAG, Chroma, and prompt configuration
-data/       Knowledge-base source documents
-model/      Chat and embedding model factories
-prompts/    System and RAG prompts
-rag/        Chroma ingestion and retrieval service
-tests/      Regression tests
-utils/      Shared helpers and conversation state management
-app.py      Streamlit entry point
+agent/      ReAct Agent、工具与中间件
+config/     RAG、Chroma 与提示词配置
+data/       知识库源文档
+model/      对话与向量模型工厂
+prompts/    系统与 RAG 提示词
+rag/        Chroma 导入与检索服务
+tests/      回归测试
+utils/      公共工具与会话状态管理
+app.py      Streamlit 入口
 ```
