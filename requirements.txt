@@ -1,0 +1,15 @@
+beautifulsoup4
+docx2txt
+langchain
+langchain-chroma
+langchain-community
+langchain-core
+langchain-text-splitters
+langgraph
+lxml
+openpyxl
+pypdf
+python-pptx
+PyYAML
+requests
+streamlit

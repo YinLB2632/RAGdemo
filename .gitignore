@@ -1,0 +1,29 @@
+# Python bytecode and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime-generated vector database and ingestion state
+chroma_db/
+logs/
+md5.text
+
+# Local IDE and agent metadata
+.idea/
+.agents/
+.codex/
+
+# Secrets and local environment files
+.env
+.env.*
+.venv/
+venv/
+
+# Historical backups and temporary files
+*.bak
+*.bak-*
+*.tmp
+
+# Operating-system files
+.DS_Store
+Thumbs.db
