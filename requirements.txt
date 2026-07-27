@@ -1,4 +1,5 @@
 beautifulsoup4
+python-dotenv
 docx2txt
 langchain
 langchain-chroma

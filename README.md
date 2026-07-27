@@ -22,10 +22,16 @@
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-$env:DASHSCOPE_API_KEY = "你的-dashscope-api-key"
 ```
 
-API Key 由 DashScope 集成组件读取。请勿将 Key 或本地 `.env` 文件提交到仓库。
+复制 `.env.example` 为 `.env`，填入你的 API Key：
+
+```powershell
+Copy-Item .env.example .env
+# 然后编辑 .env，把 your-dashscope-api-key-here 替换为真实 Key
+```
+
+请勿将 `.env` 文件提交到仓库。
 
 ## 运行
 
