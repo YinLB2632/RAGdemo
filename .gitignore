@@ -16,6 +16,7 @@ md5.text
 # Secrets and local environment files
 .env
 .env.*
+!.env.example
 .venv/
 venv/
 
