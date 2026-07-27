@@ -6,11 +6,13 @@ load_dotenv()
 import streamlit as st
 from agent.react_agent import ReactAgent
 from rag.vector_store import sync_knowledge_base_once
+from utils.config_handler import rag_conf
 from utils.conversation_manager import (
     create_conversation,
     delete_conversation,
     ensure_active_conversation,
     set_first_prompt_title,
+    trim_messages,
 )
 
 # 标题
@@ -82,7 +84,10 @@ if prompt:
     response_messages = []
     with st.spinner("智能客服思考中..."):
         # 仅复制当前会话的完整历史传给 Agent，使多轮上下文隔离，同时避免 Agent 意外修改 session_state。
-        conversation_messages = list(active_conversation["messages"])
+        conversation_messages = trim_messages(
+            list(active_conversation["messages"]),
+            rag_conf["max_history_turns"],
+        )
         res_stream = st.session_state["agent"].execute_stream(conversation_messages)
 
         def capture(generator, cache_list):

@@ -13,3 +13,4 @@ pypdf
 PyYAML
 requests
 streamlit
+rank_bm25

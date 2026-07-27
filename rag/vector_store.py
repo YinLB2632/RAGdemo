@@ -17,6 +17,44 @@ from utils.file_handler import (
 )
 from utils.logger_handler import logger
 import os
+from typing import List
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.callbacks import CallbackManagerForRetrieverRun
+from pydantic import ConfigDict
+
+
+class RRFRetriever(BaseRetriever):
+    """Reciprocal Rank Fusion 合并 BM25 与向量检索结果。"""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    bm25: object
+    vector: object
+    top_k: int = 3
+    rrf_k: int = 60  # RRF 常数，越大对头部排名差异越不敏感
+
+    def _get_relevant_documents(
+        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> List[Document]:
+        bm25_docs = self.bm25._get_relevant_documents(query, run_manager=run_manager)
+        vector_docs = self.vector._get_relevant_documents(query, run_manager=run_manager)
+
+        # 用 page_content 为 key 记录每个 doc 的 RRF 得分
+        scores: dict[str, float] = {}
+        doc_map: dict[str, Document] = {}
+
+        for rank, doc in enumerate(bm25_docs):
+            key = doc.page_content
+            scores[key] = scores.get(key, 0.0) + 1.0 / (self.rrf_k + rank + 1)
+            doc_map[key] = doc
+
+        for rank, doc in enumerate(vector_docs):
+            key = doc.page_content
+            scores[key] = scores.get(key, 0.0) + 1.0 / (self.rrf_k + rank + 1)
+            doc_map[key] = doc
+
+        sorted_keys = sorted(scores, key=lambda k: scores[k], reverse=True)
+        return [doc_map[k] for k in sorted_keys[: self.top_k]]
 
 
 def get_file_documents(read_path: str) -> list[Document]:
@@ -52,6 +90,40 @@ class VectorStoreService:
 
     def get_retriever(self):
         return self.vector_store.as_retriever(search_kwargs={"k": chroma_conf["k"]})
+
+    def get_hybrid_retriever(self):
+        """BM25 + 向量混合检索：关键词命中与语义理解互补。"""
+        from langchain_community.retrievers.bm25 import BM25Retriever
+
+        # 从 Chroma 取出所有已入库 chunk，用于构建 BM25 索引
+        collection_data = self.vector_store.get()
+        raw_docs = collection_data.get("documents") or []
+        raw_metas = collection_data.get("metadatas") or [{}] * len(raw_docs)
+
+        if not raw_docs:
+            # 知识库为空时降级为纯向量检索
+            logger.warning("[混合检索] 知识库为空，降级为向量检索")
+            return self.get_retriever()
+
+        all_docs = [
+            Document(page_content=text, metadata=meta or {})
+            for text, meta in zip(raw_docs, raw_metas)
+        ]
+
+        bm25_k = chroma_conf.get("bm25_k", chroma_conf["k"])
+        vector_k = chroma_conf.get("vector_k", chroma_conf["k"])
+        top_k = chroma_conf.get("hybrid_top_k", chroma_conf["k"])
+
+        bm25_retriever = BM25Retriever.from_documents(all_docs)
+        bm25_retriever.k = bm25_k
+
+        vector_retriever = self.vector_store.as_retriever(search_kwargs={"k": vector_k})
+
+        return RRFRetriever(
+            bm25=bm25_retriever,
+            vector=vector_retriever,
+            top_k=top_k,
+        )
 
     def load_document(self):
         """
@@ -133,7 +205,7 @@ if __name__ == '__main__':
 
     vs.load_document()
 
-    retriever = vs.get_retriever()
+    retriever = vs.get_hybrid_retriever()
 
     res = retriever.invoke("迷路")
     for r in res:

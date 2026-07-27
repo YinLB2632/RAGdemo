@@ -44,6 +44,14 @@ def set_first_prompt_title(conversation: dict, prompt: str) -> None:
         conversation["title"] += "…"
 
 
+def trim_messages(messages: list[dict], max_turns: int) -> list[dict]:
+    """保留最近 max_turns 轮（每轮含 user + assistant 共两条），超出部分从头截断。"""
+    max_messages = max_turns * 2
+    if len(messages) <= max_messages:
+        return messages
+    return messages[-max_messages:]
+
+
 def delete_conversation(conversations: list[dict], conversation_id: str) -> str:
     """删除指定会话，并返回删除后应该激活的会话 ID。"""
     for index, conversation in enumerate(conversations):
