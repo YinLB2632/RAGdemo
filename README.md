@@ -6,7 +6,7 @@
 
 - 基于本地新能源汽车知识文档的 RAG 检索问答。
 - Streamlit 会话启动时自动增量导入知识库。
-- 支持 TXT、PDF、Markdown、Word（.docx）、CSV、Excel（.xlsx）、PPT（.pptx）和 UTF-8 编码的 HTML 文档导入。
+- 支持 TXT、PDF、Markdown、Word（.docx）、CSV、Excel（.xlsx）和 UTF-8 编码的 HTML 文档导入。
 - 流式输出的 ReAct Agent，内置知识检索、天气、IP 定位和当前月份 4 个工具。
 - 侧边栏多会话管理：新建、切换、删除相互独立的内存对话。
 - 基于文件 MD5 的导入去重，跳过未变更文件的重复向量化。
@@ -46,7 +46,7 @@ python -m rag.vector_store
 把源文档放进 `data/` 目录。当前支持的扩展名为：
 
 ```text
-txt, pdf, md, docx, csv, xlsx, pptx, html
+txt, pdf, md, docx, csv, xlsx, html
 ```
 
 仓库中已提交的 `data/` 目录包含新能源汽车参考资料。生成的向量数据不纳入版本管理，在本地重新构建。

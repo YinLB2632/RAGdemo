@@ -10,7 +10,6 @@ from langchain_community.document_loaders import (
     TextLoader,
 )
 from openpyxl import load_workbook
-from pptx import Presentation
 
 
 def get_file_md5_hex(filepath: str):     # 获取文件的md5的十六进制字符串
@@ -113,30 +112,6 @@ def excel_loader(filepath: str) -> list[Document]:
     finally:
         # 只读工作簿仍会持有底层 ZIP 文件句柄，必须关闭以便 Windows 后续移动或删除文件。
         workbook.close()
-
-
-def pptx_loader(filepath: str) -> list[Document]:
-    # PPTX 的文本直接由 python-pptx 提取，避免引入 unstructured 的大型 Office
-    # 解析依赖链；这让幻灯片加载不再依赖与文本提取无关的可选组件。
-    presentation = Presentation(filepath)
-    documents = []
-    for slide_number, slide in enumerate(presentation.slides, start=1):
-        texts = []
-        for shape in slide.shapes:
-            if not hasattr(shape, "text"):
-                continue
-
-            text = shape.text.strip()
-            if text:
-                texts.append(text)
-
-        if texts:
-            documents.append(Document(
-                page_content="\n".join(texts),
-                metadata={"source": filepath, "slide_number": slide_number},
-            ))
-
-    return documents
 
 
 def html_loader(filepath: str) -> list[Document]:

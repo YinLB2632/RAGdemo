@@ -13,7 +13,6 @@ from utils.file_handler import (
     listdir_with_allowed_type,
     markdown_loader,
     pdf_loader,
-    pptx_loader,
     txt_loader,
 )
 from utils.logger_handler import logger
@@ -30,7 +29,6 @@ def get_file_documents(read_path: str) -> list[Document]:
         ".docx": docx_loader,
         ".csv": csv_loader,
         ".xlsx": excel_loader,
-        ".pptx": pptx_loader,
         ".html": html_loader,
     }
     loader = loaders.get(suffix)

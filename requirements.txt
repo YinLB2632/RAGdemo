@@ -9,7 +9,6 @@ langgraph
 lxml
 openpyxl
 pypdf
-python-pptx
 PyYAML
 requests
 streamlit

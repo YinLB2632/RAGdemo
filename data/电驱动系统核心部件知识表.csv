@@ -1,0 +1,15 @@
+﻿部件名称,所属子系统,主要功能,工作原理概述,关键参数,工程关注点,依据资料,来源URL
+驱动电机,电机本体,把电能转换为机械转矩，回馈制动时反向发电,定子磁场与转子相互作用形成转矩,峰值/持续功率、峰值/持续转矩、最高转速、效率,温升、绝缘、退磁、轴承与振动,GB/T 18488-2024,https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=357BEAB88E0A32A0375FE08E07DA5648
+定子,驱动电机,建立旋转磁场并承载绕组,三相绕组通入受控交流电产生旋转磁场,电流密度、绕组温度、绝缘等级,局部过热、匝间短路、绝缘老化,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+转子,驱动电机,在磁场作用下输出机械转矩,永磁、感应或励磁结构与定子磁场耦合,最高转速、机械强度、转动惯量,高速机械应力、永磁体退磁、动平衡,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+位置/转速传感器,驱动电机,向控制器提供转子角度和转速,旋变或其他传感方式输出位置信号,角度精度、响应时间、耐温,信号丢失会影响换相与转矩控制,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+电机控制器,控制与功率变换,根据整车指令控制电机转矩、转速和能量回馈,把直流母线电能变换为可控三相交流电,输入电压、输出电流、开关频率、效率,过压、过流、过温、控制失配,GB/T 18488-2024,https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=357BEAB88E0A32A0375FE08E07DA5648
+逆变桥功率模块,电机控制器,执行直流到三相交流的高速开关变换,半导体开关按调制策略交替导通,耐压、电流能力、结温、开关损耗,短路、过温、焊层疲劳与绝缘失效,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+直流母线电容,电机控制器,稳定直流母线并吸收开关纹波,储放电缓冲瞬态功率和高频电流,电容量、纹波电流、耐压、等效串联电阻,老化鼓包、过热、母线过压,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+栅极驱动与隔离,电机控制器,驱动功率器件并隔离高低压控制域,把控制信号转换为功率器件所需的门极信号,驱动电压、传播延迟、隔离耐压,误导通、上下桥臂直通、隔离失效,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+相电流传感器,电机控制器,测量电机相电流供闭环转矩控制和保护,霍尔、磁通门或分流器把电流转换为可测信号,量程、精度、带宽、零点漂移,偏置会造成转矩误差，失真会影响过流保护,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+控制板,电机控制器,运行电机控制、诊断和保护软件,采集传感器并计算调制与保护指令,计算周期、通信接口、功能安全机制,软件异常、通信超时、供电跌落,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+冷却回路,热管理,带走电机和控制器产生的热量,冷却液经壳体水道或冷板传递热量,流量、入口温度、压降、密封性,泄漏、堵塞、气阻会引发降额或停机,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+高压连接与母排,电气接口,在动力电池、控制器和电机之间传输高压大电流,低阻导体与可靠连接形成主功率通路,额定电压、电流、温升、绝缘与爬电距离,接触电阻增大会发热，松动会产生电弧,GB/T 18488-2024,https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=357BEAB88E0A32A0375FE08E07DA5648
+壳体与屏蔽,结构与电磁兼容,提供机械防护、密封、接地和电磁屏蔽,导电壳体与密封结构隔离外界环境和电磁干扰,防护等级、接地连续性、机械强度,进水、接地不良、屏蔽失效,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC
+集成式驱动电机系统,系统形态,把驱动电机、控制器或其他总成进行结构和功能集成,缩短电气路径并共享壳体、冷却或控制资源,系统效率、功率密度、环境适应性,热耦合、维护边界和单点故障影响扩大,GB/T 18488-2024,https://std.samr.gov.cn/gb/search/gbDetailed?id=B7906AB6F0111E9DE05397BE0A0AA0AC

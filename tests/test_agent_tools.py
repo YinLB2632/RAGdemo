@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 import rag.vector_store as vector_store
 from openpyxl import Workbook
-from pptx import Presentation
 
 from agent.tools import agent_tools
 from agent.react_agent import ReactAgent
@@ -18,7 +17,7 @@ from utils.conversation_manager import (
     get_conversation,
     set_first_prompt_title,
 )
-from utils.file_handler import excel_loader, html_loader, listdir_with_allowed_type, pptx_loader
+from utils.file_handler import excel_loader, html_loader, listdir_with_allowed_type
 
 
 def response(payload, status_code=200):
@@ -175,7 +174,6 @@ def test_external_record_tools_are_not_exposed():
         (".docx", "docx_loader"),
         (".csv", "csv_loader"),
         (".xlsx", "excel_loader"),
-        (".pptx", "pptx_loader"),
         (".html", "html_loader"),
     ),
 )
@@ -189,7 +187,6 @@ def test_get_file_documents_dispatches_case_insensitively(monkeypatch, suffix, e
         "docx_loader",
         "csv_loader",
         "excel_loader",
-        "pptx_loader",
         "html_loader",
     ):
         documents = expected_documents if loader_name == expected_loader else []
@@ -224,7 +221,7 @@ def test_html_loader_reads_utf8_chinese_page_content(tmp_path):
     assert "新能源汽车充电基础设施建设" in documents[0].page_content
 
 
-def test_office_loaders_parse_minimal_excel_and_powerpoint(tmp_path):
+def test_excel_loader_parses_minimal_workbook(tmp_path):
     excel_path = tmp_path / "smoke.xlsx"
     workbook = Workbook()
     worksheet = workbook.active
@@ -232,17 +229,7 @@ def test_office_loaders_parse_minimal_excel_and_powerpoint(tmp_path):
     worksheet.append(["spreadsheet smoke", 42])
     workbook.save(excel_path)
 
-    powerpoint_path = tmp_path / "smoke.pptx"
-    presentation = Presentation()
-    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
-    slide.shapes.title.text = "Presentation smoke"
-    slide.placeholders[1].text = "slide body 42"
-    presentation.save(powerpoint_path)
-
     excel_documents = excel_loader(str(excel_path))
-    powerpoint_documents = pptx_loader(str(powerpoint_path))
 
     assert excel_documents
-    assert powerpoint_documents
     assert "spreadsheet smoke" in " ".join(document.page_content for document in excel_documents)
-    assert "Presentation smoke" in " ".join(document.page_content for document in powerpoint_documents)
