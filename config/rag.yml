@@ -1,3 +1,5 @@
 chat_model_name: qwen3-max
 embedding_model_name: text-embedding-v4
 max_history_turns: 20
+token_threshold: 12000
+keep_recent_turns: 3

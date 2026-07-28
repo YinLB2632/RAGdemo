@@ -7,11 +7,14 @@ __pycache__/
 chroma_db/
 logs/
 md5.text
+conversations.db
 
 # Local IDE and agent metadata
 .idea/
+.vscode/
 .agents/
 .codex/
+.claude/
 
 # Secrets and local environment files
 .env

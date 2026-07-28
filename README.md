@@ -9,8 +9,8 @@
 - Streamlit 会话启动时自动增量导入知识库。
 - 支持 TXT、PDF、Markdown、Word（.docx）、CSV、Excel（.xlsx）和 UTF-8 编码的 HTML 文档导入。
 - 流式输出的 ReAct Agent，内置知识检索、天气、IP 定位和当前月份 4 个工具。
-- 侧边栏多会话管理：新建、切换、删除相互独立的内存对话。
-- **上下文窗口限制**：每个会话最多保留最近 N 轮历史（可配置），防止长对话超出模型 token 上限。
+- 侧边栏多会话管理：新建、切换、删除相互独立的对话；历史记录通过 SQLite 持久化，重启应用后完整保留。
+- **滑动窗口 + 触发式摘要**：Token 超过配置阈值时自动调用模型将早期轮次压缩为摘要，同时始终保留最近 N 轮完整对话，兼顾长对话记忆与上下文长度限制。
 - 基于文件 MD5 的导入去重，跳过未变更文件的重复向量化。
 
 ## 环境要求
@@ -70,11 +70,11 @@ txt, pdf, md, docx, csv, xlsx, html
 
 ## 多会话
 
-侧边栏可以新建、切换和删除对话。每个对话拥有独立的消息历史，多轮上下文在不同对话之间互不共享。对话记录仅存在于当前 Streamlit 浏览器会话的内存中；刷新浏览器或开启新会话会重新开始。
+侧边栏可以新建、切换和删除对话。每个对话拥有独立的消息历史，多轮上下文在不同对话之间互不共享。所有对话与消息通过 SQLite（`conversations.db`）持久化，重启应用后历史记录完整保留。
 
 ## 配置
 
-- `config/rag.yml`：DashScope 对话与向量模型名称，以及 `max_history_turns`（上下文保留轮数，默认 20）。
+- `config/rag.yml`：DashScope 对话与向量模型名称；`token_threshold`（触发摘要压缩的 Token 警戒线，默认 12000）；`keep_recent_turns`（压缩后始终保留的完整轮数，默认 3）；`max_history_turns`（已废弃，保留作兼容）。
 - `config/chroma.yml`：Chroma 集合、分块参数（`chunk_size`、`chunk_overlap`）、混合检索参数（`bm25_k`、`vector_k`、`hybrid_top_k`）、数据路径和支持的文件类型。
 - `config/prompts.yml`：提示词文件路径。
 - `prompts/`：系统提示词与 RAG 总结提示词。

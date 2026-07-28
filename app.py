@@ -11,8 +11,11 @@ from utils.conversation_manager import (
     create_conversation,
     delete_conversation,
     ensure_active_conversation,
+    load_conversations_from_db,
+    maybe_compress_history,
+    prepare_context_for_agent,
+    save_current_conversation,
     set_first_prompt_title,
-    trim_messages,
 )
 
 # 标题
@@ -28,7 +31,7 @@ if "agent" not in st.session_state:
     st.session_state["agent"] = ReactAgent()
 
 if "conversations" not in st.session_state:
-    st.session_state["conversations"] = []
+    st.session_state["conversations"] = load_conversations_from_db()
 
 if "active_conversation_id" not in st.session_state:
     st.session_state["active_conversation_id"] = None
@@ -71,6 +74,8 @@ with st.sidebar:
             st.rerun()
 
 for message in active_conversation["messages"]:
+    if message["role"] == "summary":
+        continue
     st.chat_message(message["role"]).write(message["content"])
 
 # 用户输入提示词
@@ -83,11 +88,7 @@ if prompt:
 
     response_messages = []
     with st.spinner("智能客服思考中..."):
-        # 仅复制当前会话的完整历史传给 Agent，使多轮上下文隔离，同时避免 Agent 意外修改 session_state。
-        conversation_messages = trim_messages(
-            list(active_conversation["messages"]),
-            rag_conf["max_history_turns"],
-        )
+        conversation_messages = prepare_context_for_agent(active_conversation["messages"])
         res_stream = st.session_state["agent"].execute_stream(conversation_messages)
 
         def capture(generator, cache_list):
@@ -102,4 +103,10 @@ if prompt:
         st.chat_message("assistant").write_stream(capture(res_stream, response_messages))
         # 助手回复只写入当前窗口；流式结束后保存完整内容，确保该窗口下一轮获得顺序正确的历史。
         active_conversation["messages"].append({"role": "assistant", "content": response_messages[-1]})
+        save_current_conversation(active_conversation)
+        maybe_compress_history(
+            active_conversation,
+            rag_conf["token_threshold"],
+            rag_conf["keep_recent_turns"],
+        )
         st.rerun()
