@@ -16,6 +16,7 @@ from utils.file_handler import (
     txt_loader,
 )
 from utils.logger_handler import logger
+import json
 import os
 from typing import List
 from langchain_core.retrievers import BaseRetriever
@@ -127,65 +128,110 @@ class VectorStoreService:
 
     def load_document(self):
         """
-        从数据文件夹内读取数据文件，转为向量存入向量库
-        要计算文件的MD5做去重
-        :return: None
+        增量同步知识库，处理四种情况：
+        - 新文件：读取、分片、写入向量库，记录 路径→MD5 映射
+        - 已修改文件：MD5 变化时，先删除向量库中的旧 chunks，再重新入库
+        - 已删除文件：从 data 目录消失的文件，清理向量库中对应的 chunks
+        - 未变文件：MD5 一致，直接跳过，不重复入库
+
+        映射存储在 md5_hex_store 指定的 JSON 文件中，格式为 {文件绝对路径: MD5 十六进制值}。
         """
 
-        def check_md5_hex(md5_for_check: str):
-            if not os.path.exists(get_abs_path(chroma_conf["md5_hex_store"])):
-                # 创建文件
-                open(get_abs_path(chroma_conf["md5_hex_store"]), "w", encoding="utf-8").close()
-                return False            # md5 没处理过
+        # md5 映射文件的绝对路径
+        store_path = get_abs_path(chroma_conf["md5_hex_store"])
 
-            with open(get_abs_path(chroma_conf["md5_hex_store"]), "r", encoding="utf-8") as f:
-                for line in f.readlines():
-                    line = line.strip()
-                    if line == md5_for_check:
-                        return True     # md5 处理过
+        def load_md5_map() -> dict[str, str]:
+            """从 JSON 文件读取 {路径: MD5} 映射；文件不存在或损坏时返回空字典。"""
+            if not os.path.exists(store_path):
+                return {}
+            with open(store_path, "r", encoding="utf-8") as f:
+                try:
+                    return json.load(f)
+                except (json.JSONDecodeError, ValueError):
+                    # 文件损坏（如旧版纯文本格式），视为空映射，触发全量重建
+                    return {}
 
-                return False            # md5 没处理过
+        def save_md5_map(md5_map: dict[str, str]):
+            """将 {路径: MD5} 映射持久化到 JSON 文件，每次成功入库后立即调用以保证崩溃可恢复。"""
+            with open(store_path, "w", encoding="utf-8") as f:
+                json.dump(md5_map, f, ensure_ascii=False, indent=2)
 
-        def save_md5_hex(md5_for_check: str):
-            with open(get_abs_path(chroma_conf["md5_hex_store"]), "a", encoding="utf-8") as f:
-                f.write(md5_for_check + "\n")
+        def delete_chunks_by_source(source_path: str):
+            """
+            按文件路径批量删除向量库中对应的所有 chunks。
+            Chroma 入库时会在每个 chunk 的 metadata['source'] 中保留文件绝对路径，
+            通过 where 过滤可精确定位，避免修改或删除文件后旧内容残留影响检索结果。
+            """
+            result = self.vector_store.get(where={"source": source_path})
+            old_ids = result.get("ids", [])
+            if old_ids:
+                self.vector_store.delete(ids=old_ids)
+                logger.info(f"[加载知识库] 已删除 {source_path} 的 {len(old_ids)} 个旧 chunk")
 
-        allowed_files_path: list[str] = listdir_with_allowed_type(
+        # 扫描 data 目录，获取所有允许类型的文件绝对路径列表
+        allowed_files_path: list[str] = list(listdir_with_allowed_type(
             get_abs_path(chroma_conf["data_path"]),
             tuple(chroma_conf["allow_knowledge_file_type"]),
-        )
+        ))
 
+        # 加载已持久化的 路径→MD5 映射
+        md5_map = load_md5_map()
+        # 转为集合用于 O(1) 查找，判断映射中的路径是否仍存在于 data 目录
+        allowed_set = set(allowed_files_path)
+
+        # 第一阶段：清理已从 data 目录删除的文件对应的向量数据
+        # 先收集需要删除的路径列表，避免在迭代 md5_map 的同时修改它
+        deleted_paths = [p for p in md5_map if p not in allowed_set]
+        for path in deleted_paths:
+            delete_chunks_by_source(path)
+            del md5_map[path]
+            logger.info(f"[加载知识库] 文件已删除，清理向量库：{path}")
+        if deleted_paths:
+            # 有删除操作时立即持久化，保持映射文件与向量库状态一致
+            save_md5_map(md5_map)
+
+        # 第二阶段：处理当前 data 目录中的每个文件
         for path in allowed_files_path:
-            # 获取文件的MD5
+            # 计算当前文件的 MD5，用于与已记录值比较，判断内容是否变化
             md5_hex = get_file_md5_hex(path)
-
-            if check_md5_hex(md5_hex):
-                logger.info(f"[加载知识库]{path}内容已经存在知识库内，跳过")
+            if md5_hex is None:
+                # 计算失败（权限问题等），跳过；错误已由 get_file_md5_hex 内部记录
                 continue
 
+            if path in md5_map:
+                if md5_map[path] == md5_hex:
+                    # MD5 一致：文件内容未改变，跳过，不重复入库
+                    logger.info(f"[加载知识库] {path} 内容未变，跳过")
+                    continue
+                # MD5 不一致：文件已被修改，先删除向量库中的旧 chunks，再重新入库
+                logger.info(f"[加载知识库] {path} 内容已修改，重新入库")
+                delete_chunks_by_source(path)
+
+            # 以下为新文件或已修改文件的入库流程
             try:
+                # 根据文件后缀选择对应的 Loader 读取文档内容
                 documents: list[Document] = get_file_documents(path)
 
                 if not documents:
-                    logger.warning(f"[加载知识库]{path}内没有有效文本内容，跳过")
+                    logger.warning(f"[加载知识库] {path} 内没有有效文本内容，跳过")
                     continue
 
+                # 将文档切分为 chunks（大小和重叠由 chroma.yml 的 chunk_size/chunk_overlap 控制）
                 split_document: list[Document] = self.spliter.split_documents(documents)
 
                 if not split_document:
-                    logger.warning(f"[加载知识库]{path}分片后没有有效文本内容，跳过")
+                    logger.warning(f"[加载知识库] {path} 分片后没有有效文本内容，跳过")
                     continue
 
-                # 将内容存入向量库
+                # 将 chunks 写入向量库
                 self.vector_store.add_documents(split_document)
-
-                # 记录这个已经处理好的文件的md5，避免下次重复加载
-                save_md5_hex(md5_hex)
-
-                logger.info(f"[加载知识库]{path} 内容加载成功")
+                # 入库成功后立即更新映射并持久化，确保进程崩溃时已处理的文件不会重复入库
+                md5_map[path] = md5_hex
+                save_md5_map(md5_map)
+                logger.info(f"[加载知识库] {path} 内容加载成功")
             except Exception as e:
-                # exc_info为True会记录详细的报错堆栈，如果为False仅记录报错信息本身
-                logger.error(f"[加载知识库]{path}加载失败：{str(e)}", exc_info=True)
+                # 单个文件失败不影响其他文件；md5_map 不更新，下次启动时会自动重试该文件
+                logger.error(f"[加载知识库] {path} 加载失败：{str(e)}", exc_info=True)
                 continue
 
 
