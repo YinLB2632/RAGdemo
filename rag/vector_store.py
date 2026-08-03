@@ -51,7 +51,7 @@ class RRFRetriever(BaseRetriever):
 
         for rank, doc in enumerate(vector_docs):
             key = doc.page_content
-            scores[key] = scores.get(key, 0.0) + 1.0 / (self.rrf_k + rank + 1)
+            scores[key] = scores.get(key, 0.0) + 1.5 / (self.rrf_k + rank + 1)
             doc_map[key] = doc
 
         sorted_keys = sorted(scores, key=lambda k: scores[k], reverse=True)
