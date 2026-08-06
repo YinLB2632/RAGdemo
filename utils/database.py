@@ -11,9 +11,16 @@ from uuid import uuid4
 DB_PATH = Path("conversations.db")
 
 
+def get_connection() -> sqlite3.Connection:
+    """返回启用了外键约束的数据库连接。"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
 def init_database() -> None:
     """初始化数据库表结构。"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
 
     # 创建会话表
@@ -57,7 +64,7 @@ def load_all_conversations() -> list[dict]:
     """从数据库加载所有会话（按更新时间降序）。"""
     init_database()
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
@@ -100,7 +107,7 @@ def load_all_conversations() -> list[dict]:
 def save_conversation(conversation: dict) -> bool:
     """保存或更新会话到数据库。"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         cursor = conn.cursor()
 
         now = datetime.now().isoformat()
@@ -146,7 +153,7 @@ def save_conversation(conversation: dict) -> bool:
 def delete_conversation(conversation_id: str) -> bool:
     """从数据库删除会话及其所有消息。"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         cursor = conn.cursor()
 
         # 由于设置了 ON DELETE CASCADE，删除会话会自动删除关联消息
@@ -163,7 +170,7 @@ def delete_conversation(conversation_id: str) -> bool:
 
 def get_conversation(conversation_id: str) -> Optional[dict]:
     """根据ID获取单个会话。"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 

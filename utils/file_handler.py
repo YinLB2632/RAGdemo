@@ -18,6 +18,7 @@ def get_file_md5_hex(filepath: str):     # 获取文件的md5的十六进制字�
         logger.error(f"[md5计算]文件{filepath}不存在")
         return
 
+
     if not os.path.isfile(filepath):
         logger.error(f"[md5计算]路径{filepath}不是文件")
         return

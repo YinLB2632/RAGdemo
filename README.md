@@ -16,6 +16,7 @@
 ## 环境要求
 
 - Python 3.10 或更高版本。
+- LangChain 1.0.0 或更高版本（`create_agent` API 自 v1.0 引入）。
 - 一个可访问所配置对话与向量模型的 DashScope API Key。
 
 ## 安装

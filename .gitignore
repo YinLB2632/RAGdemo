@@ -6,7 +6,7 @@ __pycache__/
 # Runtime-generated vector database and ingestion state
 chroma_db/
 logs/
-md5.text
+md5.json
 conversations.db
 
 # Local IDE and agent metadata

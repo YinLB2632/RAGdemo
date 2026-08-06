@@ -1,7 +1,7 @@
 beautifulsoup4
 python-dotenv
 docx2txt
-langchain
+langchain>=1.0.0
 langchain-chroma
 langchain-community
 langchain-core

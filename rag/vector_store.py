@@ -40,17 +40,17 @@ class RRFRetriever(BaseRetriever):
         bm25_docs = self.bm25._get_relevant_documents(query, run_manager=run_manager)
         vector_docs = self.vector._get_relevant_documents(query, run_manager=run_manager)
 
-        # 用 page_content 为 key 记录每个 doc 的 RRF 得分
-        scores: dict[str, float] = {}
-        doc_map: dict[str, Document] = {}
+        # 用 (page_content, source) 为 key，避免不同文件相同正文的 chunk 互相覆盖
+        scores: dict[tuple, float] = {}
+        doc_map: dict[tuple, Document] = {}
 
         for rank, doc in enumerate(bm25_docs):
-            key = doc.page_content
+            key = (doc.page_content, doc.metadata.get("source", ""))
             scores[key] = scores.get(key, 0.0) + 1.0 / (self.rrf_k + rank + 1)
             doc_map[key] = doc
 
         for rank, doc in enumerate(vector_docs):
-            key = doc.page_content
+            key = (doc.page_content, doc.metadata.get("source", ""))
             scores[key] = scores.get(key, 0.0) + 1.5 / (self.rrf_k + rank + 1)
             doc_map[key] = doc
 
