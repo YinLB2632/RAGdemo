@@ -10,12 +10,43 @@ from utils.prompt_loader import load_rag_prompts
 from langchain_core.prompts import PromptTemplate
 from model.factory import chat_model
 from utils.config_handler import rag_conf
+from utils.logger_handler import logger
+
+
+def _rewrite_query(query: str) -> list[str]:
+    """用小模型将原始提问改写为多个检索友好的 query，失败时返回仅含原始 query 的列表。"""
+    if not rag_conf.get("query_rewrite_enabled", True):
+        return [query]
+
+    count = rag_conf.get("query_rewrite_count", 2)
+    model_name = rag_conf.get("query_rewrite_model_name", "qwen-turbo")
+
+    try:
+        from langchain_community.chat_models.tongyi import ChatTongyi
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        rewrite_model = ChatTongyi(model=model_name)
+        system = (
+            "你是检索优化助手。将用户的口语化提问改写为多个检索友好的表达，"
+            "只扩展关键词和表达方式，不改变提问意图。"
+            f"输出恰好 {count} 个改写结果，每行一个，不加序号或其他符号。"
+        )
+        resp = rewrite_model.invoke([
+            SystemMessage(content=system),
+            HumanMessage(content=query),
+        ])
+        rewrites = [line.strip() for line in resp.content.strip().splitlines() if line.strip()]
+        if rewrites:
+            return [query] + rewrites[:count]
+    except Exception as e:
+        logger.warning(f"[Query改写] 失败，降级使用原始query：{e}")
+
+    return [query]
 
 
 def _rerank(query: str, docs: list[Document], top_n: int) -> list[Document]:
     """用 DashScope gte-rerank 对候选 chunk 重排序，失败时原序返回。"""
     try:
-        import dashscope
         from dashscope import TextReRank
 
         passages = [{"text": doc.page_content} for doc in docs]
@@ -44,8 +75,20 @@ class RagSummarizeService(object):
         self.chain = self.prompt_template | self.model | StrOutputParser()
 
     def retriever_docs(self, query: str) -> list[Document]:
-        candidates = self.retriever.invoke(query)
+        queries = _rewrite_query(query)
+
+        # 多路检索，按 (content, source) 去重，保留首次出现的文档
+        seen: set[tuple] = set()
+        candidates: list[Document] = []
+        for q in queries:
+            for doc in self.retriever.invoke(q):
+                key = (doc.page_content, doc.metadata.get("source", ""))
+                if key not in seen:
+                    seen.add(key)
+                    candidates.append(doc)
+
         top_n = rag_conf.get("rerank_top_n", 4)
+        # reranker 始终用原始 query 评分，避免改写偏差影响相关性判断
         return _rerank(query, candidates, top_n)
 
     def rag_summarize(self, query: str) -> str:
@@ -66,4 +109,4 @@ class RagSummarizeService(object):
 
 if __name__ == '__main__':
     rag = RagSummarizeService()
-    # print(rag.rag_summarize("小户型适合哪些扫地机器人"))
+    # print(rag.rag_summarize("电动汽车冬天续航为什么变短"))
