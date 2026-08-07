@@ -98,6 +98,8 @@ def maybe_compress_history(
         return
 
     old = messages[:-keep_count]
+    if not old:
+        return
     recent = messages[-keep_count:]
     new_summary = generate_summary(old)
     conversation["messages"] = [{"role": "summary", "content": new_summary}] + recent

@@ -102,7 +102,10 @@ if prompt:
 
         st.chat_message("assistant").write_stream(capture(res_stream, response_messages))
         # 助手回复只写入当前窗口；流式结束后保存完整内容，确保该窗口下一轮获得顺序正确的历史。
-        active_conversation["messages"].append({"role": "assistant", "content": response_messages[-1]})
+        response_text = "".join(response_messages).strip()
+        if not response_text:
+            response_text = "（无响应）"
+        active_conversation["messages"].append({"role": "assistant", "content": response_text})
         save_current_conversation(active_conversation)
         maybe_compress_history(
             active_conversation,

@@ -2,10 +2,13 @@
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
+
+from utils.logger_handler import logger
 
 # 数据库文件路径
 DB_PATH = Path("conversations.db")
@@ -68,40 +71,40 @@ def load_all_conversations() -> list[dict]:
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # 查询所有会话
-    cursor.execute("""
-        SELECT id, title, created_at, updated_at
-        FROM conversations
-        ORDER BY updated_at DESC
-    """)
-
-    conversations = []
-    for row in cursor.fetchall():
-        conversation_id = row["id"]
-
-        # 查询该会话的所有消息
+    try:
         cursor.execute("""
-            SELECT role, content, created_at
-            FROM messages
-            WHERE conversation_id = ?
-            ORDER BY id ASC
-        """, (conversation_id,))
+            SELECT id, title, created_at, updated_at
+            FROM conversations
+            ORDER BY updated_at DESC
+        """)
 
-        messages = [
-            {"role": msg["role"], "content": msg["content"]}
-            for msg in cursor.fetchall()
-        ]
+        conversations = []
+        for row in cursor.fetchall():
+            conversation_id = row["id"]
 
-        conversations.append({
-            "id": conversation_id,
-            "title": row["title"],
-            "messages": messages,
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-        })
+            cursor.execute("""
+                SELECT role, content, created_at
+                FROM messages
+                WHERE conversation_id = ?
+                ORDER BY id ASC
+            """, (conversation_id,))
 
-    conn.close()
-    return conversations
+            messages = [
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in cursor.fetchall()
+            ]
+
+            conversations.append({
+                "id": conversation_id,
+                "title": row["title"],
+                "messages": messages,
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            })
+
+        return conversations
+    finally:
+        conn.close()
 
 
 def save_conversation(conversation: dict) -> bool:
@@ -146,7 +149,7 @@ def save_conversation(conversation: dict) -> bool:
         return True
 
     except Exception as e:
-        print(f"保存会话失败: {e}")
+        logger.error(f"保存会话失败: {e}")
         return False
 
 
@@ -164,7 +167,7 @@ def delete_conversation(conversation_id: str) -> bool:
         return True
 
     except Exception as e:
-        print(f"删除会话失败: {e}")
+        logger.error(f"删除会话失败: {e}")
         return False
 
 
@@ -174,36 +177,35 @@ def get_conversation(conversation_id: str) -> Optional[dict]:
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT id, title, created_at, updated_at
-        FROM conversations
-        WHERE id = ?
-    """, (conversation_id,))
+    try:
+        cursor.execute("""
+            SELECT id, title, created_at, updated_at
+            FROM conversations
+            WHERE id = ?
+        """, (conversation_id,))
 
-    row = cursor.fetchone()
-    if not row:
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        cursor.execute("""
+            SELECT role, content
+            FROM messages
+            WHERE conversation_id = ?
+            ORDER BY id ASC
+        """, (conversation_id,))
+
+        messages = [
+            {"role": msg["role"], "content": msg["content"]}
+            for msg in cursor.fetchall()
+        ]
+
+        return {
+            "id": row["id"],
+            "title": row["title"],
+            "messages": messages,
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+    finally:
         conn.close()
-        return None
-
-    # 查询消息
-    cursor.execute("""
-        SELECT role, content
-        FROM messages
-        WHERE conversation_id = ?
-        ORDER BY id ASC
-    """, (conversation_id,))
-
-    messages = [
-        {"role": msg["role"], "content": msg["content"]}
-        for msg in cursor.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "id": row["id"],
-        "title": row["title"],
-        "messages": messages,
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-    }

@@ -35,7 +35,8 @@ def _rewrite_query(query: str) -> list[str]:
             SystemMessage(content=system),
             HumanMessage(content=query),
         ])
-        rewrites = [line.strip() for line in resp.content.strip().splitlines() if line.strip()]
+        content = resp.content or ""
+        rewrites = [line.strip() for line in content.strip().splitlines() if line.strip()]
         if rewrites:
             return [query] + rewrites[:count]
     except Exception as e:
@@ -60,8 +61,8 @@ def _rerank(query: str, docs: list[Document], top_n: int) -> list[Document]:
         if resp.status_code == 200:
             ranked = sorted(resp.output.results, key=lambda r: r.relevance_score, reverse=True)
             return [docs[r.index] for r in ranked]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[Rerank] DashScope API 调用失败，降级使用原始排序：{e}")
     return docs[:top_n]
 
 
