@@ -12,4 +12,5 @@ separators: ["\n\n", "\n", ".", "!", "?", "。", "！", "？", " ", ""]
 # 混合检索配置
 bm25_k: 10             # BM25 召回候选数
 vector_k: 10           # 向量检索召回候选数
-hybrid_top_k: 4        # RRF 合并后最终返回给 LLM 的数量
+hybrid_top_k: 8        # RRF 合并后送入 Reranker 的候选数（Reranker 再从中选 rerank_top_n）
+rrf_score_threshold: 0.003  # RRF 分数低于此值的结果直接丢弃，避免不相关内容传入 LLM

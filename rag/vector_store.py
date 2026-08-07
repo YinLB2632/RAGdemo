@@ -33,6 +33,7 @@ class RRFRetriever(BaseRetriever):
     vector: object
     top_k: int = 3
     rrf_k: int = 60  # RRF 常数，越大对头部排名差异越不敏感
+    score_threshold: float = 0.0  # 低于此分数的结果直接丢弃
 
     def _get_relevant_documents(
         self, query: str, *, run_manager: CallbackManagerForRetrieverRun
@@ -55,7 +56,10 @@ class RRFRetriever(BaseRetriever):
             doc_map[key] = doc
 
         sorted_keys = sorted(scores, key=lambda k: scores[k], reverse=True)
-        return [doc_map[k] for k in sorted_keys[: self.top_k]]
+        return [
+            doc_map[k] for k in sorted_keys[: self.top_k]
+            if scores[k] >= self.score_threshold
+        ]
 
 
 def get_file_documents(read_path: str) -> list[Document]:
@@ -88,13 +92,18 @@ class VectorStoreService:
             separators=chroma_conf["separators"],
             length_function=len,
         )
+        self._hybrid_retriever_cache = None  # 知识库变更时置 None 触发重建
 
     def get_retriever(self):
         return self.vector_store.as_retriever(search_kwargs={"k": chroma_conf["k"]})
 
     def get_hybrid_retriever(self):
-        """BM25 + 向量混合检索：关键词命中与语义理解互补。"""
+        """BM25 + 向量混合检索：关键词命中与语义理解互补。BM25 索引在首次调用时构建并缓存，知识库同步后自动失效。"""
+        if self._hybrid_retriever_cache is not None:
+            return self._hybrid_retriever_cache
+
         from langchain_community.retrievers.bm25 import BM25Retriever
+        import jieba
 
         # 从 Chroma 取出所有已入库 chunk，用于构建 BM25 索引
         collection_data = self.vector_store.get()
@@ -114,17 +123,23 @@ class VectorStoreService:
         bm25_k = chroma_conf.get("bm25_k", chroma_conf["k"])
         vector_k = chroma_conf.get("vector_k", chroma_conf["k"])
         top_k = chroma_conf.get("hybrid_top_k", chroma_conf["k"])
+        score_threshold = chroma_conf.get("rrf_score_threshold", 0.0)
 
-        bm25_retriever = BM25Retriever.from_documents(all_docs)
+        bm25_retriever = BM25Retriever.from_documents(
+            all_docs,
+            preprocess_func=lambda text: jieba.lcut(text),
+        )
         bm25_retriever.k = bm25_k
 
         vector_retriever = self.vector_store.as_retriever(search_kwargs={"k": vector_k})
 
-        return RRFRetriever(
+        self._hybrid_retriever_cache = RRFRetriever(
             bm25=bm25_retriever,
             vector=vector_retriever,
             top_k=top_k,
+            score_threshold=score_threshold,
         )
+        return self._hybrid_retriever_cache
 
     def load_document(self):
         """

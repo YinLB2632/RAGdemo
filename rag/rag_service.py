@@ -2,49 +2,68 @@
 """
 总结服务类：用户提问，搜索参考资料，将提问和参考资料提交给模型，让模型总结回复
 """
+import os
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from rag.vector_store import VectorStoreService
 from utils.prompt_loader import load_rag_prompts
 from langchain_core.prompts import PromptTemplate
 from model.factory import chat_model
+from utils.config_handler import rag_conf
+
+
+def _rerank(query: str, docs: list[Document], top_n: int) -> list[Document]:
+    """用 DashScope gte-rerank 对候选 chunk 重排序，失败时原序返回。"""
+    try:
+        import dashscope
+        from dashscope import TextReRank
+
+        passages = [{"text": doc.page_content} for doc in docs]
+        resp = TextReRank.call(
+            model=rag_conf.get("rerank_model_name", "gte-rerank"),
+            query=query,
+            documents=passages,
+            top_n=top_n,
+            return_documents=False,
+        )
+        if resp.status_code == 200:
+            ranked = sorted(resp.output.results, key=lambda r: r.relevance_score, reverse=True)
+            return [docs[r.index] for r in ranked]
+    except Exception:
+        pass
+    return docs[:top_n]
 
 
 class RagSummarizeService(object):
     def __init__(self):
-        self.vector_store = VectorStoreService()
-        self.retriever = self.vector_store.get_hybrid_retriever()
+        self.vector_store_service = VectorStoreService()
+        self.retriever = self.vector_store_service.get_hybrid_retriever()
         self.prompt_text = load_rag_prompts()
         self.prompt_template = PromptTemplate.from_template(self.prompt_text)
         self.model = chat_model
-        self.chain = self._init_chain()
-
-    def _init_chain(self):
-        chain = self.prompt_template | self.model | StrOutputParser()
-        return chain
+        self.chain = self.prompt_template | self.model | StrOutputParser()
 
     def retriever_docs(self, query: str) -> list[Document]:
-        return self.retriever.invoke(query)
+        candidates = self.retriever.invoke(query)
+        top_n = rag_conf.get("rerank_top_n", 4)
+        return _rerank(query, candidates, top_n)
 
     def rag_summarize(self, query: str) -> str:
-
         context_docs = self.retriever_docs(query)
 
-        context = ""
-        counter = 0
-        for doc in context_docs:
-            counter += 1
-            context += f"【参考资料{counter}】: 参考资料：{doc.page_content} | 参考元数据：{doc.metadata}\n"
+        if not context_docs:
+            return "参考资料中未找到相关信息。"
 
-        return self.chain.invoke(
-            {
-                "input": query,
-                "context": context,
-            }
-        )
+        context = ""
+        for counter, doc in enumerate(context_docs, start=1):
+            source = os.path.basename(doc.metadata.get("source", "未知来源"))
+            sheet = doc.metadata.get("sheet_name", "")
+            source_label = f"{source}（{sheet}）" if sheet else source
+            context += f"【参考资料{counter}】（来源：{source_label}）\n{doc.page_content}\n\n"
+
+        return self.chain.invoke({"input": query, "context": context})
 
 
 if __name__ == '__main__':
     rag = RagSummarizeService()
-
     # print(rag.rag_summarize("小户型适合哪些扫地机器人"))

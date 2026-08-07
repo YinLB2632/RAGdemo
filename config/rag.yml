@@ -1,5 +1,7 @@
 chat_model_name: qwen3-max
 embedding_model_name: text-embedding-v4
+rerank_model_name: gte-rerank
+rerank_top_n: 4
 max_history_turns: 20
 token_threshold: 12000
 keep_recent_turns: 3
