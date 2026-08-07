@@ -4,7 +4,10 @@
 
 ## 功能特性
 
-- **混合检索（BM25 + 向量）**：关键词精确匹配与语义理解双路召回，通过 Reciprocal Rank Fusion（RRF）合并排序，提升检索准确率。
+- **语义切分**：使用 `SemanticChunker` 按语义边界切分文档，避免将同一语义段落硬切成碎片，提升检索命中质量。
+- **混合检索（BM25 + 向量）**：jieba 中文分词 + 向量双路召回，通过 Reciprocal Rank Fusion（RRF）合并排序，兼顾关键词精确匹配与语义理解。
+- **Reranker 精排**：召回候选经 DashScope `gte-rerank` 重排序，再取 top_n 传入 LLM，显著提升相关性。
+- **Query 改写**：用小模型（`qwen-turbo`）将口语化提问改写为多个检索友好的 query，原始 query 始终保留，改写失败自动降级。
 - 基于本地新能源汽车知识文档的 RAG 检索问答。
 - Streamlit 会话启动时自动增量导入知识库。
 - 支持 TXT、PDF、Markdown、Word（.docx）、CSV、Excel（.xlsx）和 UTF-8 编码的 HTML 文档导入。
@@ -17,7 +20,7 @@
 
 - Python 3.10 或更高版本。
 - LangChain 1.0.0 或更高版本（`create_agent` API 自 v1.0 引入）。
-- 一个可访问所配置对话与向量模型的 DashScope API Key。
+- 一个可访问所配置对话、向量与 Rerank 模型的 DashScope API Key。
 
 ## 安装
 
@@ -44,14 +47,14 @@ python -m streamlit run app.py
 
 首次打开页面时，应用会扫描 `data/` 目录，把支持的文件增量写入 Chroma。文件路径与 MD5 的映射记录在 `md5.json` 中：内容未变的文件跳过，已修改的文件自动替换旧 chunks，从 `data/` 删除的文件自动清理向量数据。
 
-**更换分块参数后需重建向量库：**
+**更换切分策略或调整语义切分参数后需重建向量库：**
 
 ```powershell
 Remove-Item -Recurse -Force chroma_db
 Remove-Item md5.json
 ```
 
-重启应用后会自动重新入库。
+重启应用后会自动重新入库。语义切分入库时会调用 Embedding API 对每个句子向量化，首次入库比固定分块慢，属正常现象。
 
 手动执行导入：
 
@@ -75,19 +78,35 @@ txt, pdf, md, docx, csv, xlsx, html
 
 ## 配置
 
-- `config/rag.yml`：DashScope 对话与向量模型名称；`token_threshold`（触发摘要压缩的 Token 警戒线，默认 12000）；`keep_recent_turns`（压缩后始终保留的完整轮数，默认 3）；`max_history_turns`（已废弃，保留作兼容）。
-- `config/chroma.yml`：Chroma 集合、分块参数（`chunk_size`、`chunk_overlap`）、混合检索参数（`bm25_k`、`vector_k`、`hybrid_top_k`）、数据路径和支持的文件类型。
+### `config/rag.yml`
+
+| 参数 | 说明 | 默认值 |
+|---|---|---|
+| `chat_model_name` | 对话模型 | `qwen3-max` |
+| `embedding_model_name` | 向量模型 | `text-embedding-v4` |
+| `rerank_model_name` | Rerank 模型 | `gte-rerank` |
+| `rerank_top_n` | Reranker 精排后返回给 LLM 的数量 | `4` |
+| `query_rewrite_enabled` | 是否启用 Query 改写 | `true` |
+| `query_rewrite_model_name` | 改写用小模型 | `qwen-turbo` |
+| `query_rewrite_count` | 改写 query 数量 | `2` |
+| `token_threshold` | 触发摘要压缩的 Token 警戒线 | `12000` |
+| `keep_recent_turns` | 压缩后始终保留的完整轮数 | `3` |
+
+### `config/chroma.yml`
+
+| 参数 | 说明 | 默认值 |
+|---|---|---|
+| `semantic_breakpoint_type` | 语义切分断点类型（`percentile` / `standard_deviation` / `interquartile` / `gradient`） | `percentile` |
+| `semantic_breakpoint_threshold` | 切分阈值，值越大 chunk 越粗 | `90` |
+| `bm25_k` | BM25 召回候选数量 | `10` |
+| `vector_k` | 向量检索召回候选数量 | `10` |
+| `hybrid_top_k` | RRF 合并后送入 Reranker 的候选数量 | `8` |
+| `rrf_score_threshold` | RRF 分数下限，低于此值直接丢弃 | `0.003` |
+
+### 其他配置文件
+
 - `config/prompts.yml`：提示词文件路径。
 - `prompts/`：系统提示词与 RAG 总结提示词。
-
-### 混合检索参数说明
-
-| 参数 | 含义 | 默认值 |
-|---|---|---|
-| `bm25_k` | BM25 召回候选数量 | 10 |
-| `vector_k` | 向量检索召回候选数量 | 10 |
-| `hybrid_top_k` | RRF 合并后传给 LLM 的最终数量 | 4 |
-| `k` | 纯向量检索模式下的返回数量 | 5 |
 
 ## 测试
 
