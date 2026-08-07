@@ -3,6 +3,7 @@ import hashlib
 from utils.logger_handler import logger
 from langchain_core.documents import Document
 from langchain_community.document_loaders import (
+    BSHTMLLoader,
     CSVLoader,
     Docx2txtLoader,
     PyPDFLoader,
@@ -115,34 +116,10 @@ def excel_loader(filepath: str) -> list[Document]:
 
 
 def html_loader(filepath: str) -> list[Document]:
-    from bs4 import BeautifulSoup
-
-    with open(filepath, "r", encoding="utf-8") as f:
-        soup = BeautifulSoup(f, "html.parser")
-
-    documents = []
-
-    # 单独处理每张表格，保留行列对应关系（与 excel_loader 保持一致）
-    for table in soup.find_all("table"):
-        rows = []
-        for tr in table.find_all("tr"):
-            cells = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
-            if any(cells):
-                rows.append(" | ".join(cells))
-        if rows:
-            documents.append(Document(
-                page_content="\n".join(rows),
-                metadata={"source": filepath},
-            ))
-        table.decompose()  # 从 soup 中移除已处理的表格，避免正文重复提取
-
-    # 提取非表格正文
-    text = soup.get_text(separator="\n")
-    text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
-    if text:
-        documents.append(Document(
-            page_content=text,
-            metadata={"source": filepath},
-        ))
-
-    return documents
+    # 中文政府和资讯网页通常为 UTF-8；显式指定编码并使用 html.parser，避免 Windows 默认 GBK 或 lxml 对不规范页面漏读正文。
+    return BSHTMLLoader(
+        filepath,
+        open_encoding="utf-8",
+        bs_kwargs={"features": "html.parser"},
+        get_text_separator="\n",
+    ).load()
