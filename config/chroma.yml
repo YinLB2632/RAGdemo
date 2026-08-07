@@ -5,9 +5,11 @@ data_path: data
 md5_hex_store: md5.json
 allow_knowledge_file_type: ["txt", "pdf", "md", "docx", "csv", "xlsx", "html"]
 
-chunk_size: 400
-chunk_overlap: 60
-separators: ["\n\n", "\n", ".", "!", "?", "。", "！", "？", " ", ""]
+# 语义切分配置（SemanticChunker）
+# breakpoint_threshold_type 可选: percentile | standard_deviation | interquartile | gradient
+# percentile: 相邻句子语义距离超过第 N 百分位时切分，值越大 chunk 越粗，值越小 chunk 越细
+semantic_breakpoint_type: percentile
+semantic_breakpoint_threshold: 90
 
 # 混合检索配置
 bm25_k: 10             # BM25 召回候选数

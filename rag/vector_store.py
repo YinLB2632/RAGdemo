@@ -2,7 +2,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from utils.config_handler import chroma_conf
 from model.factory import embed_model
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_experimental.text_splitter import SemanticChunker
 from utils.path_tool import get_abs_path
 from utils.file_handler import (
     csv_loader,
@@ -86,11 +86,10 @@ class VectorStoreService:
             persist_directory=chroma_conf["persist_directory"],
         )
 
-        self.spliter = RecursiveCharacterTextSplitter(
-            chunk_size=chroma_conf["chunk_size"],
-            chunk_overlap=chroma_conf["chunk_overlap"],
-            separators=chroma_conf["separators"],
-            length_function=len,
+        self.spliter = SemanticChunker(
+            embeddings=embed_model,
+            breakpoint_threshold_type=chroma_conf.get("semantic_breakpoint_type", "percentile"),
+            breakpoint_threshold_amount=chroma_conf.get("semantic_breakpoint_threshold", 90),
         )
         self._hybrid_retriever_cache = None  # 知识库变更时置 None 触发重建
 
