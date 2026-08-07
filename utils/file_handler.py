@@ -93,21 +93,33 @@ def excel_loader(filepath: str) -> list[Document]:
     try:
         documents = []
         for worksheet in workbook.worksheets:
-            rows = []
-            for row in worksheet.iter_rows():
-                values = [
-                    str(cell.value).strip()
-                    for cell in row
-                    if cell.value is not None and str(cell.value).strip()
-                ]
-                if values:
-                    rows.append(" | ".join(values))
+            rows = list(worksheet.iter_rows(values_only=True))
+            if not rows:
+                continue
 
-            if rows:
-                documents.append(Document(
-                    page_content="\n".join(rows),
-                    metadata={"source": filepath, "sheet_name": worksheet.title},
-                ))
+            # 第一个非空行作为表头，后续每行生成独立 Document（"列名: 值 | ..."格式）
+            header_idx = next(
+                (i for i, row in enumerate(rows) if any(v is not None and str(v).strip() for v in row)),
+                None,
+            )
+            if header_idx is None:
+                continue
+
+            headers = [str(v).strip() if v is not None else "" for v in rows[header_idx]]
+
+            for i, row in enumerate(rows):
+                if i == header_idx:
+                    continue
+                parts = [
+                    f"{h}: {str(v).strip()}"
+                    for h, v in zip(headers, row)
+                    if v is not None and str(v).strip() and h
+                ]
+                if parts:
+                    documents.append(Document(
+                        page_content=" | ".join(parts),
+                        metadata={"source": filepath, "sheet_name": worksheet.title, "row": i + 1},
+                    ))
 
         return documents
     finally:

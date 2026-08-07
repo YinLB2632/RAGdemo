@@ -15,6 +15,7 @@ conversations.db
 .agents/
 .codex/
 .claude/
+docs/superpowers/
 
 # Secrets and local environment files
 .env
